@@ -132,6 +132,13 @@ def prepare_batch_data(batch_data):
             data_clean[col] = data_clean[col].astype(str)
     
     return data_clean
+
+# Function for achievement assessment
+def get_achievement_milestones(prediction, input_data):
+    """Get achievement milestones and goals"""
+    milestones = []
+    
+    if prediction == 2:  # High performance
         if input_data['Hours_Studied'].values[0] >= 5:
             milestones.append("🏆 Exceptional Study Habits - Consider peer tutoring")
         if input_data['Previous_Scores'].values[0] >= 85:
