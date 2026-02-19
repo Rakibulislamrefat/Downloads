@@ -1,0 +1,35 @@
+Hours_Studied,Attendance,Parental_Involvement,Access_to_Resources,Extracurricular_Activities,Sleep_Hours,Previous_Scores,Motivation_Level,Internet_Access,Tutoring_Sessions,Family_Income,Teacher_Quality,School_Type,Peer_Influence,Physical_Activity,Learning_Disabilities,Parental_Education_Level,Distance_from_Home,Gender,Exam_Score
+1.0,60.0,2.0,2.0,1.0,5.0,30.0,2.0,0.0,0.0,Low,4.0,Public,2.0,1.0,1.0,High School,25.0,Male,32.0
+1.5,65.0,2.0,3.0,2.0,5.5,35.0,2.0,0.0,0.0,Low,5.0,Public,3.0,1.5,1.0,High School,22.0,Female,35.0
+2.0,70.0,3.0,4.0,3.0,6.0,40.0,3.0,1.0,1.0,Low,6.0,Public,4.0,2.0,0.0,Bachelor,20.0,Male,38.0
+2.5,75.0,4.0,5.0,4.0,6.5,45.0,4.0,1.0,2.0,Low,7.0,Private,5.0,3.0,0.0,Bachelor,15.0,Female,42.0
+1.8,68.0,3.0,3.0,2.0,5.8,38.0,3.0,0.0,1.0,Low,5.0,Public,3.0,1.8,1.0,High School,24.0,Male,36.0
+2.2,72.0,3.0,4.0,3.0,6.2,43.0,3.0,1.0,1.0,Low,6.0,Public,4.0,2.5,0.0,Bachelor,18.0,Female,40.0
+1.2,62.0,2.0,2.0,2.0,5.2,32.0,2.0,0.0,0.0,Low,4.0,Public,2.0,1.2,1.0,High School,28.0,Male,30.0
+2.3,73.0,4.0,5.0,4.0,6.3,44.0,4.0,1.0,2.0,Low,7.0,Private,5.0,3.2,0.0,Bachelor,14.0,Female,41.0
+1.6,66.0,2.0,3.0,2.0,5.6,36.0,2.0,0.0,1.0,Low,5.0,Public,3.0,1.6,1.0,High School,24.0,Male,33.0
+2.1,71.0,3.0,4.0,3.0,6.1,42.0,3.0,1.0,1.0,Low,6.0,Public,4.0,2.3,0.0,Bachelor,17.0,Female,39.0
+5.0,82.0,5.0,7.0,6.0,7.8,72.0,7.0,1.0,3.0,Medium,8.0,Private,7.0,5.0,0.0,Bachelor,10.0,Male,68.0
+5.2,83.0,5.0,7.0,6.0,7.9,73.0,7.0,1.0,3.0,Medium,8.0,Private,7.0,5.2,0.0,Bachelor,9.0,Female,70.0
+4.8,81.0,5.0,6.0,5.0,7.7,70.0,7.0,1.0,2.0,Medium,7.0,Private,6.0,4.8,0.0,Bachelor,12.0,Male,66.0
+5.5,85.0,6.0,8.0,7.0,8.0,75.0,8.0,1.0,4.0,Medium,9.0,Private,8.0,5.5,0.0,Master,8.0,Female,72.0
+5.0,82.0,5.0,7.0,6.0,7.8,71.0,7.0,1.0,3.0,Medium,8.0,Private,7.0,5.0,0.0,Bachelor,11.0,Male,69.0
+5.3,84.0,5.0,7.0,7.0,7.9,74.0,7.0,1.0,3.0,Medium,8.0,Private,7.0,5.3,0.0,Bachelor,10.0,Female,71.0
+4.9,80.0,5.0,6.0,5.0,7.6,69.0,6.0,1.0,2.0,Medium,7.0,Private,6.0,4.9,0.0,Bachelor,13.0,Male,65.0
+5.4,85.0,6.0,8.0,7.0,8.0,76.0,8.0,1.0,4.0,Medium,9.0,Private,8.0,5.4,0.0,Master,7.0,Female,73.0
+5.1,83.0,5.0,7.0,6.0,7.8,72.0,7.0,1.0,3.0,Medium,8.0,Private,7.0,5.1,0.0,Bachelor,10.0,Male,68.0
+5.0,81.0,5.0,7.0,6.0,7.7,70.0,7.0,1.0,2.0,Medium,7.0,Private,6.0,5.0,0.0,Bachelor,12.0,Female,67.0
+8.5,95.0,9.0,10.0,9.0,8.5,92.0,10.0,1.0,5.0,High,10.0,Private,9.0,8.0,0.0,Master,5.0,Male,88.0
+8.7,96.0,9.0,10.0,9.0,8.6,94.0,10.0,1.0,5.0,High,10.0,Private,9.0,8.2,0.0,Master,4.0,Female,91.0
+8.3,94.0,8.0,9.0,8.0,8.4,90.0,9.0,1.0,4.0,High,9.0,Private,8.0,7.8,0.0,Master,6.0,Male,86.0
+8.9,97.0,9.0,10.0,10.0,8.7,95.0,10.0,1.0,5.0,High,10.0,Private,10.0,8.5,0.0,PhD,3.0,Female,93.0
+8.4,94.0,8.0,9.0,8.0,8.3,91.0,9.0,1.0,4.0,High,9.0,Private,8.0,7.9,0.0,Master,6.0,Male,87.0
+8.6,95.0,9.0,10.0,9.0,8.5,93.0,10.0,1.0,5.0,High,10.0,Private,9.0,8.1,0.0,Master,5.0,Female,90.0
+8.2,93.0,8.0,9.0,8.0,8.2,89.0,9.0,1.0,4.0,High,9.0,Private,8.0,7.7,0.0,Master,7.0,Male,85.0
+8.8,96.0,9.0,10.0,9.0,8.6,94.0,10.0,1.0,5.0,High,10.0,Private,9.0,8.3,0.0,Master,4.0,Female,92.0
+8.5,95.0,9.0,10.0,9.0,8.5,92.0,10.0,1.0,5.0,High,10.0,Private,9.0,8.0,0.0,Master,5.0,Male,88.0
+8.4,94.0,8.0,9.0,8.0,8.4,91.0,9.0,1.0,4.0,High,9.0,Private,8.0,7.9,0.0,Master,6.0,Female,87.0
+3.5,78.0,5.0,6.0,5.0,7.0,60.0,6.0,1.0,2.0,Medium,7.0,Private,6.0,4.0,0.0,Bachelor,12.0,Male,58.0
+3.8,79.0,5.0,6.0,5.0,7.1,62.0,6.0,1.0,2.0,Medium,7.0,Private,6.0,4.2,0.0,Bachelor,11.0,Female,60.0
+3.2,76.0,4.0,5.0,4.0,6.8,58.0,5.0,1.0,2.0,Medium,6.0,Public,5.0,3.5,0.0,Bachelor,14.0,Male,55.0
+3.6,77.0,4.0,6.0,5.0,6.9,59.0,6.0,1.0,2.0,Medium,7.0,Private,6.0,4.0,0.0,Bachelor,13.0,Female,57.0

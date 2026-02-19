@@ -207,42 +207,55 @@ else:
         with tab2:
             # Create prediction button
             if st.button("🎯 Generate Prediction & Analysis", key="predict_single", use_container_width=True):
-                # Prepare input data with proper encoding
-                input_data = pd.DataFrame({
-                    'Hours_Studied': [float(hours_studied)],
-                    'Attendance': [float(attendance)],
-                    'Parental_Involvement': [float(parental_involvement)],
-                    'Access_to_Resources': [float(access_to_resources)],
-                    'Extracurricular_Activities': [float(extracurricular)],
-                    'Sleep_Hours': [float(sleep_hours)],
-                    'Previous_Scores': [float(previous_scores)],
-                    'Motivation_Level': [float(motivation)],
-                    'Internet_Access': [float(1 if internet_access == "Yes" else 0)],
-                    'Tutoring_Sessions': [float(tutoring)],
-                    'Family_Income': [family_income],
-                    'Teacher_Quality': [float(teacher_quality)],
-                    'School_Type': [school_type],
-                    'Peer_Influence': [float(peer_influence)],
-                    'Physical_Activity': [float(physical_activity)],
-                    'Learning_Disabilities': [float(1 if learning_disability == "Yes" else 0)],
-                    'Parental_Education_Level': [parent_education],
-                    'Distance_from_Home': [float(distance_from_home)],
-                    'Gender': [gender]
-                })
-                
+                # Prepare input data with explicit type casting
                 try:
+                    input_data = pd.DataFrame({
+                        'Hours_Studied': [float(hours_studied)],
+                        'Attendance': [float(attendance)],
+                        'Parental_Involvement': [float(parental_involvement)],
+                        'Access_to_Resources': [float(access_to_resources)],
+                        'Extracurricular_Activities': [float(extracurricular)],
+                        'Sleep_Hours': [float(sleep_hours)],
+                        'Previous_Scores': [float(previous_scores)],
+                        'Motivation_Level': [float(motivation)],
+                        'Internet_Access': [float(1 if internet_access == "Yes" else 0)],
+                        'Tutoring_Sessions': [float(tutoring)],
+                        'Family_Income': [str(family_income)],
+                        'Teacher_Quality': [float(teacher_quality)],
+                        'School_Type': [str(school_type)],
+                        'Peer_Influence': [float(peer_influence)],
+                        'Physical_Activity': [float(physical_activity)],
+                        'Learning_Disabilities': [float(1 if learning_disability == "Yes" else 0)],
+                        'Parental_Education_Level': [str(parent_education)],
+                        'Distance_from_Home': [float(distance_from_home)],
+                        'Gender': [str(gender)]
+                    })
+                    
+                    # Ensure proper dtypes
+                    numeric_cols = ['Hours_Studied', 'Attendance', 'Parental_Involvement', 'Access_to_Resources',
+                                   'Extracurricular_Activities', 'Sleep_Hours', 'Previous_Scores', 'Motivation_Level',
+                                   'Internet_Access', 'Tutoring_Sessions', 'Teacher_Quality', 'Peer_Influence',
+                                   'Physical_Activity', 'Learning_Disabilities', 'Distance_from_Home']
+                    
+                    for col in numeric_cols:
+                        input_data[col] = input_data[col].astype('float64')
+                    
+                    categorical_cols = ['Family_Income', 'School_Type', 'Parental_Education_Level', 'Gender']
+                    for col in categorical_cols:
+                        input_data[col] = input_data[col].astype('str')
+                    
                     # Transform features
                     X_transformed = preprocessor.transform(input_data)
-                    X_transformed = pd.DataFrame(X_transformed)
+                    X_transformed = pd.DataFrame(X_transformed).astype('float64')
                     
                     # Align with training features
-                    X_aligned = pd.DataFrame(0, index=np.arange(X_transformed.shape[0]), columns=training_features)
+                    X_aligned = pd.DataFrame(0, index=np.arange(X_transformed.shape[0]), columns=training_features, dtype='float64')
                     for col in X_transformed.columns:
                         if col in X_aligned.columns:
                             X_aligned[col] = X_transformed[col].values
                     
                     # Make prediction
-                    prediction = best_model.predict(X_aligned)[0]
+                    prediction = int(best_model.predict(X_aligned)[0])
                     
                     # Risk assessment
                     risk_score, risk_factors = assess_risk_level(input_data)
@@ -299,43 +312,56 @@ else:
                                 st.warning(factor)
                 
                 except Exception as e:
-                    st.error(f"Error making prediction: {e}")
+                    st.error(f"Error making prediction: {str(e)}")
         
         with tab3:
             if st.button("📊 Run Detailed Analysis", key="detailed_analysis", use_container_width=True):
-                # Prepare input data with proper encoding
-                input_data = pd.DataFrame({
-                    'Hours_Studied': [float(hours_studied)],
-                    'Attendance': [float(attendance)],
-                    'Parental_Involvement': [float(parental_involvement)],
-                    'Access_to_Resources': [float(access_to_resources)],
-                    'Extracurricular_Activities': [float(extracurricular)],
-                    'Sleep_Hours': [float(sleep_hours)],
-                    'Previous_Scores': [float(previous_scores)],
-                    'Motivation_Level': [float(motivation)],
-                    'Internet_Access': [float(1 if internet_access == "Yes" else 0)],
-                    'Tutoring_Sessions': [float(tutoring)],
-                    'Family_Income': [family_income],
-                    'Teacher_Quality': [float(teacher_quality)],
-                    'School_Type': [school_type],
-                    'Peer_Influence': [float(peer_influence)],
-                    'Physical_Activity': [float(physical_activity)],
-                    'Learning_Disabilities': [float(1 if learning_disability == "Yes" else 0)],
-                    'Parental_Education_Level': [parent_education],
-                    'Distance_from_Home': [float(distance_from_home)],
-                    'Gender': [gender]
-                })
-                
+                # Prepare input data with explicit type casting
                 try:
-                    X_transformed = preprocessor.transform(input_data)
-                    X_transformed = pd.DataFrame(X_transformed)
+                    input_data = pd.DataFrame({
+                        'Hours_Studied': [float(hours_studied)],
+                        'Attendance': [float(attendance)],
+                        'Parental_Involvement': [float(parental_involvement)],
+                        'Access_to_Resources': [float(access_to_resources)],
+                        'Extracurricular_Activities': [float(extracurricular)],
+                        'Sleep_Hours': [float(sleep_hours)],
+                        'Previous_Scores': [float(previous_scores)],
+                        'Motivation_Level': [float(motivation)],
+                        'Internet_Access': [float(1 if internet_access == "Yes" else 0)],
+                        'Tutoring_Sessions': [float(tutoring)],
+                        'Family_Income': [str(family_income)],
+                        'Teacher_Quality': [float(teacher_quality)],
+                        'School_Type': [str(school_type)],
+                        'Peer_Influence': [float(peer_influence)],
+                        'Physical_Activity': [float(physical_activity)],
+                        'Learning_Disabilities': [float(1 if learning_disability == "Yes" else 0)],
+                        'Parental_Education_Level': [str(parent_education)],
+                        'Distance_from_Home': [float(distance_from_home)],
+                        'Gender': [str(gender)]
+                    })
                     
-                    X_aligned = pd.DataFrame(0, index=np.arange(X_transformed.shape[0]), columns=training_features)
+                    # Ensure proper dtypes
+                    numeric_cols = ['Hours_Studied', 'Attendance', 'Parental_Involvement', 'Access_to_Resources',
+                                   'Extracurricular_Activities', 'Sleep_Hours', 'Previous_Scores', 'Motivation_Level',
+                                   'Internet_Access', 'Tutoring_Sessions', 'Teacher_Quality', 'Peer_Influence',
+                                   'Physical_Activity', 'Learning_Disabilities', 'Distance_from_Home']
+                    
+                    for col in numeric_cols:
+                        input_data[col] = input_data[col].astype('float64')
+                    
+                    categorical_cols = ['Family_Income', 'School_Type', 'Parental_Education_Level', 'Gender']
+                    for col in categorical_cols:
+                        input_data[col] = input_data[col].astype('str')
+                    
+                    X_transformed = preprocessor.transform(input_data)
+                    X_transformed = pd.DataFrame(X_transformed).astype('float64')
+                    
+                    X_aligned = pd.DataFrame(0, index=np.arange(X_transformed.shape[0]), columns=training_features, dtype='float64')
                     for col in X_transformed.columns:
                         if col in X_aligned.columns:
                             X_aligned[col] = X_transformed[col].values
                     
-                    prediction = best_model.predict(X_aligned)[0]
+                    prediction = int(best_model.predict(X_aligned)[0])
                     performance_map = {0: 'Low', 1: 'Medium', 2: 'High'}
                     predicted_performance = performance_map.get(prediction, 'Unknown')
                     
@@ -416,7 +442,7 @@ else:
                         st.info(rec)
                 
                 except Exception as e:
-                    st.error(f"Error in analysis: {e}")
+                    st.error(f"Error in analysis: {str(e)}")
     
     # ==================== BATCH PREDICTION PAGE ====================
     elif page == "📊 Batch Prediction":
@@ -555,18 +581,40 @@ else:
             try:
                 data = pd.read_csv(uploaded_file)
                 
-                # Clean and prepare data
-                data = prepare_batch_data(data)
+                # Clean and prepare data with robust error handling
+                try:
+                    data = prepare_batch_data(data)
+                except Exception as prep_error:
+                    st.warning(f"Using basic data cleaning: {str(prep_error)}")
+                    # Fallback: manually clean data
+                    numeric_cols = ['Hours_Studied', 'Attendance', 'Parental_Involvement', 'Access_to_Resources',
+                                   'Extracurricular_Activities', 'Sleep_Hours', 'Previous_Scores', 'Motivation_Level',
+                                   'Internet_Access', 'Tutoring_Sessions', 'Teacher_Quality', 'Peer_Influence',
+                                   'Physical_Activity', 'Learning_Disabilities', 'Distance_from_Home']
+                    
+                    for col in numeric_cols:
+                        if col in data.columns:
+                            data[col] = pd.to_numeric(data[col], errors='coerce').fillna(0).astype('float64')
+                    
+                    categorical_cols = ['Family_Income', 'School_Type', 'Parental_Education_Level', 'Gender']
+                    for col in categorical_cols:
+                        if col in data.columns:
+                            data[col] = data[col].fillna('Unknown').astype('str')
+                
+                # Fill any remaining NaN values
+                data = data.fillna(0)
                 
                 # Make predictions for all data
                 X_data = preprocessor.transform(data)
-                X_data = pd.DataFrame(X_data)
-                X_data = X_data.astype('float64')
+                X_data = pd.DataFrame(X_data).astype('float64')
+                X_data = X_data.fillna(0)
                 
                 X_aligned = pd.DataFrame(0, index=np.arange(X_data.shape[0]), columns=training_features, dtype='float64')
                 for col in X_data.columns:
                     if col in X_aligned.columns:
                         X_aligned[col] = X_data[col].values
+                
+                X_aligned = X_aligned.fillna(0).astype('float64')
                 
                 predictions = best_model.predict(X_aligned)
                 proba = best_model.predict_proba(X_aligned)
@@ -581,7 +629,7 @@ else:
                 with col1:
                     st.metric("👥 Total Students", len(data))
                 with col2:
-                    avg_confidence = data['Confidence'].mean()
+                    avg_confidence = float(data['Confidence'].mean())
                     st.metric("📊 Avg Confidence", f"{avg_confidence*100:.1f}%")
                 with col3:
                     high_performers = len(data[data['Predicted_Performance'] == 'High'])
@@ -641,28 +689,31 @@ else:
                 risk_data = []
                 for idx, row in data.iterrows():
                     risk_score = 0
-                    if row.get('Hours_Studied', 0) < 2:
+                    if float(row.get('Hours_Studied', 0)) < 2:
                         risk_score += 3
-                    if row.get('Attendance', 0) < 70:
+                    if float(row.get('Attendance', 0)) < 70:
                         risk_score += 3
-                    if row.get('Previous_Scores', 0) < 50:
+                    if float(row.get('Previous_Scores', 0)) < 50:
                         risk_score += 3
-                    if row.get('Sleep_Hours', 0) < 6:
+                    if float(row.get('Sleep_Hours', 0)) < 6:
                         risk_score += 2
                     risk_data.append(risk_score)
                 
                 data['Risk_Score'] = risk_data
                 
-                risk_categories = pd.cut(data['Risk_Score'], bins=[0, 3, 6, 12], labels=['Low Risk', 'Moderate Risk', 'High Risk'], include_lowest=True)
-                risk_counts = risk_categories.value_counts().dropna()
-                
-                fig = go.Figure(data=[go.Pie(
-                    labels=risk_counts.index,
-                    values=risk_counts.values,
-                    marker=dict(colors=['#6bcf7f', '#ffd93d', '#ff6b6b'])
-                )])
-                fig.update_layout(title="Student Risk Distribution", height=400)
-                st.plotly_chart(fig, use_container_width=True)
+                try:
+                    risk_categories = pd.cut(data['Risk_Score'], bins=[0, 3, 6, 12], labels=['Low Risk', 'Moderate Risk', 'High Risk'], include_lowest=True)
+                    risk_counts = risk_categories.value_counts().dropna()
+                    
+                    fig = go.Figure(data=[go.Pie(
+                        labels=risk_counts.index,
+                        values=risk_counts.values,
+                        marker=dict(colors=['#6bcf7f', '#ffd93d', '#ff6b6b'])
+                    )])
+                    fig.update_layout(title="Student Risk Distribution", height=400)
+                    st.plotly_chart(fig, use_container_width=True)
+                except Exception as e:
+                    st.warning(f"Could not create risk distribution chart: {str(e)}")
                 
                 # Top and bottom performers
                 col1, col2 = st.columns(2)
