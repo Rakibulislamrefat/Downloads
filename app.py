@@ -133,6 +133,151 @@ def prepare_batch_data(batch_data):
     
     return data_clean
 
+
+def safe_transform(df_input):
+    """Attempt to transform with the preprocessor; if it fails, clean types to match encoder categories and retry."""
+    try:
+        res = preprocessor.transform(df_input)
+        # If transform returns an array, try to wrap into DataFrame with training feature names
+        try:
+            import numpy as _np
+            if hasattr(res, 'shape') and len(res.shape) == 2 and training_features is not None and res.shape[1] == len(training_features):
+                return pd.DataFrame(res, columns=list(training_features))
+        except Exception:
+            pass
+        return res
+    except Exception:
+        # First apply general cleaning
+        df_clean = prepare_batch_data(df_input.copy())
+        # Try to coerce categorical columns to the types expected by the fitted encoders
+        try:
+            if hasattr(preprocessor, 'transformers_'):
+                for name, transformer, cols in preprocessor.transformers_:
+                    # Only handle encoders with categories_
+                    enc = transformer
+                    if hasattr(enc, 'categories_') and cols is not None:
+                        # cols may be a slice or list
+                        try:
+                            col_list = list(cols)
+                        except Exception:
+                            # if cols is not iterable, skip
+                            continue
+                        for idx, col in enumerate(col_list):
+                            if col not in df_clean.columns:
+                                continue
+                            try:
+                                cats = enc.categories_[idx]
+                                # if categories are numeric, cast column to numeric
+                                if len(cats) > 0 and np.all([isinstance(x, (int, float, np.integer, np.floating)) for x in cats]):
+                                    df_clean[col] = pd.to_numeric(df_clean[col], errors='coerce').fillna(0)
+                                else:
+                                    df_clean[col] = df_clean[col].astype(str)
+                            except Exception:
+                                df_clean[col] = df_clean[col].astype(str)
+        except Exception:
+            # fallback: ensure known categorical columns are strings
+            for c in ['Family_Income', 'School_Type', 'Parental_Education_Level', 'Gender']:
+                if c in df_clean.columns:
+                    df_clean[c] = df_clean[c].astype(str)
+
+        # Final attempt: try manual transform to avoid OneHotEncoder issues
+        try:
+            return manual_transform(df_clean)
+        except Exception:
+            # as last resort, try the transformer once more
+            return preprocessor.transform(df_clean)
+
+
+def manual_transform(df_clean):
+    """Build transformed feature array manually using scaler + one-hot by aligning to training_features."""
+    # numeric transformer
+    num_cols = []
+    cat_cols = []
+    if hasattr(preprocessor, 'transformers_'):
+        for name, transformer, cols in preprocessor.transformers_:
+            if name == 'num':
+                num_cols = list(cols)
+            if name == 'cat':
+                cat_cols = list(cols)
+
+    # Prepare numeric part
+    X_num = np.zeros((len(df_clean), 0))
+    if num_cols:
+        num_df = df_clean.reindex(columns=num_cols).copy()
+        for c in num_df.columns:
+            num_df[c] = pd.to_numeric(num_df[c], errors='coerce').fillna(0).astype('float64')
+        scaler = preprocessor.named_transformers_.get('num', None)
+        if scaler is not None:
+            X_num = scaler.transform(num_df)
+        else:
+            X_num = num_df.values.astype('float64')
+
+    # Prepare categorical one-hot aligned to training_features
+    feat_cols = list(training_features)
+    X_aligned = pd.DataFrame(0.0, index=np.arange(len(df_clean)), columns=feat_cols, dtype='float64')
+
+    # fill numeric columns (prefix 'num__')
+    for i, col in enumerate(feat_cols):
+        if col.startswith('num__'):
+            orig = col.replace('num__', '')
+            if orig in df_clean.columns:
+                # locate index in num_cols to pick scaled value
+                if num_cols and orig in num_cols and scaler is not None:
+                    j = num_cols.index(orig)
+                    X_aligned[col] = X_num[:, j]
+                else:
+                    X_aligned[col] = pd.to_numeric(df_clean.get(orig, 0), errors='coerce').fillna(0).astype('float64')
+
+    # fill categorical one-hot columns (prefix 'cat__<col>_<category>')
+    for col in feat_cols:
+        if col.startswith('cat__'):
+            # parse 'cat__<col>_<category>' robustly
+            try:
+                _, rest = col.split('__', 1)
+                kname, kcat = rest.rsplit('_', 1)
+            except Exception:
+                continue
+            if kname in df_clean.columns:
+                val = str(df_clean[kname].astype(str).values[0])
+                if val == kcat:
+                    X_aligned[col] = 1.0
+
+    # return as DataFrame already aligned to training_features for downstream code
+    return X_aligned
+
+
+def map_numeric_to_category(value, kind):
+    """Map numeric slider values to categorical labels expected by the encoder."""
+    try:
+        v = float(value)
+    except Exception:
+        return str(value)
+
+    if kind == '3level':
+        if v < 4:
+            return 'Low'
+        elif v < 8:
+            return 'Medium'
+        else:
+            return 'High'
+    if kind == 'yesno':
+        return 'Yes' if v > 0 else 'No'
+    if kind == 'peer':
+        if v <= 3:
+            return 'Negative'
+        elif v <= 7:
+            return 'Neutral'
+        else:
+            return 'Positive'
+    if kind == 'distance':
+        if v < 10:
+            return 'Near'
+        elif v < 25:
+            return 'Moderate'
+        else:
+            return 'Far'
+    return str(value)
+
 # Function for achievement assessment
 def get_achievement_milestones(prediction, input_data):
     """Get achievement milestones and goals"""
@@ -164,6 +309,158 @@ else:
     # ==================== SINGLE PREDICTION PAGE ====================
     if page == "🔮 Single Prediction":
         st.header("🔮 Single Student Prediction & Analysis")
+        # Quick individual input form for fast single-student predictions
+        with st.expander("🧾 Quick Individual Input (fast form)", expanded=False):
+            st.write("Fill core fields and click Predict to get the performance category.")
+            # Preset buttons to auto-fill the form
+            pcol1, pcol2, pcol3 = st.columns(3)
+            if pcol1.button("Fill Low preset"):
+                st.session_state.update({
+                    'qi_hours': 1.5, 'qi_attendance': 65, 'qi_previous': 35, 'qi_motivation': 3,
+                    'qi_tutoring': 0, 'qi_sleep': 5.5, 'qi_parental': 3, 'qi_income': 'Low',
+                    'qi_parentedu': 'High School', 'qi_distance': 25.0, 'qi_access': 2,
+                    'qi_internet': 'No', 'qi_school': 'Public', 'qi_gender': 'Male', 'qi_learning': 'Yes'
+                })
+                st.experimental_rerun()
+            if pcol2.button("Fill Medium preset"):
+                st.session_state.update({
+                    'qi_hours': 5.0, 'qi_attendance': 80, 'qi_previous': 70, 'qi_motivation': 6,
+                    'qi_tutoring': 2, 'qi_sleep': 7.5, 'qi_parental': 5, 'qi_income': 'Medium',
+                    'qi_parentedu': 'Bachelor', 'qi_distance': 12.0, 'qi_access': 6,
+                    'qi_internet': 'Yes', 'qi_school': 'Public', 'qi_gender': 'Female', 'qi_learning': 'No'
+                })
+                st.experimental_rerun()
+            if pcol3.button("Fill High preset"):
+                st.session_state.update({
+                    'qi_hours': 9.0, 'qi_attendance': 96, 'qi_previous': 90, 'qi_motivation': 9,
+                    'qi_tutoring': 4, 'qi_sleep': 8.0, 'qi_parental': 8, 'qi_income': 'High',
+                    'qi_parentedu': 'Master', 'qi_distance': 5.0, 'qi_access': 9,
+                    'qi_internet': 'Yes', 'qi_school': 'Private', 'qi_gender': 'Female', 'qi_learning': 'No'
+                })
+                st.experimental_rerun()
+
+            qcol1, qcol2, qcol3 = st.columns(3)
+            with qcol1:
+                qi_hours = st.number_input("Study Hours (per week)", 0.0, 100.0, 5.0, step=0.5, key='qi_hours')
+                qi_attendance = st.number_input("Attendance (%)", 0, 100, 80, step=1, key='qi_attendance')
+                qi_previous = st.number_input("Previous Scores (%)", 0, 100, 75, step=1, key='qi_previous')
+                qi_motivation = st.slider("Motivation Level (1-10)", 1, 10, 7, step=1, key='qi_motivation')
+                qi_tutoring = st.number_input("Tutoring Sessions (per month)", 0, 20, 2, step=1, key='qi_tutoring')
+                qi_extracurricular = st.slider("Extracurricular Activities (1-10)", 1, 10, 5, step=1, key='qi_extracurricular')
+            with qcol2:
+                qi_sleep = st.number_input("Sleep Hours (per night)", 0.0, 12.0, 8.0, step=0.5, key='qi_sleep')
+                qi_parental = st.slider("Parental Involvement (1-10)", 1, 10, 5, step=1, key='qi_parental')
+                qi_family_income = st.selectbox("Family Income Level", ["Low", "Medium", "High"], key='qi_income')
+                qi_parent_edu = st.selectbox("Parental Education Level", ["High School", "Bachelor", "Master", "PhD"], key='qi_parentedu')
+                qi_distance = st.number_input("Distance from Home (km)", 0.0, 100.0, 10.0, step=0.5, key='qi_distance')
+                qi_teacher_quality = st.slider("Teacher Quality (1-10)", 1, 10, 6, step=1, key='qi_teacher')
+            with qcol3:
+                qi_access = st.slider("Access to Resources (1-10)", 1, 10, 5, step=1, key='qi_access')
+                qi_internet = st.selectbox("Internet Access", ["Yes", "No"], key='qi_internet')
+                qi_school = st.selectbox("School Type", ["Public", "Private"], key='qi_school')
+                qi_gender = st.selectbox("Gender", ["Male", "Female"], key='qi_gender')
+                qi_learning = st.selectbox("Learning Disabilities", ["Yes", "No"], key='qi_learning')
+                qi_peer_influence = st.slider("Peer Influence (1-10)", 1, 10, 5, step=1, key='qi_peer')
+                qi_physical_activity = st.slider("Physical Activity (hours/week)", 0.0, 10.0, 3.0, step=0.5, key='qi_physical')
+
+            if st.button("🔎 Quick Predict", key='quick_predict'):
+                try:
+                    qi_input = pd.DataFrame({
+                        'Hours_Studied': [float(qi_hours)],
+                        'Attendance': [float(qi_attendance)],
+                        'Parental_Involvement': [map_numeric_to_category(qi_parental, '3level')],
+                        'Access_to_Resources': [map_numeric_to_category(qi_access, '3level')],
+                        'Extracurricular_Activities': [map_numeric_to_category(qi_extracurricular, 'yesno')],
+                        'Sleep_Hours': [float(qi_sleep)],
+                        'Previous_Scores': [float(qi_previous)],
+                        'Motivation_Level': [map_numeric_to_category(qi_motivation, '3level')],
+                        'Internet_Access': [str('Yes' if qi_internet == 'Yes' else 'No')],
+                        'Tutoring_Sessions': [float(qi_tutoring)],
+                        'Family_Income': [str(qi_family_income)],
+                        'Teacher_Quality': [map_numeric_to_category(qi_teacher_quality, '3level')],
+                        'School_Type': [str(qi_school)],
+                        'Peer_Influence': [map_numeric_to_category(qi_peer_influence, 'peer')],
+                        'Physical_Activity': [float(qi_physical_activity)],
+                        'Learning_Disabilities': [str('Yes' if qi_learning == 'Yes' else 'No')],
+                        'Parental_Education_Level': [str(qi_parent_edu)],
+                        'Distance_from_Home': [map_numeric_to_category(qi_distance, 'distance')],
+                        'Gender': [str(qi_gender)]
+                    })
+
+                    # Ensure proper dtypes
+                    # Only true numeric columns should be cast to float here.
+                    numeric_cols_qi = ['Hours_Studied', 'Attendance', 'Sleep_Hours', 'Previous_Scores', 'Tutoring_Sessions', 'Physical_Activity']
+                    for col in numeric_cols_qi:
+                        qi_input[col] = pd.to_numeric(qi_input[col], errors='coerce').fillna(0).astype('float64')
+
+                    categorical_cols_qi = ['Family_Income', 'School_Type', 'Parental_Education_Level', 'Gender',
+                                           'Parental_Involvement', 'Access_to_Resources', 'Extracurricular_Activities',
+                                           'Motivation_Level', 'Internet_Access', 'Teacher_Quality', 'Peer_Influence',
+                                           'Learning_Disabilities', 'Distance_from_Home']
+                    for col in categorical_cols_qi:
+                        qi_input[col] = qi_input[col].astype('str')
+
+                    X_qi = safe_transform(qi_input)
+                    X_qi = pd.DataFrame(X_qi).astype('float64')
+
+                    X_qi_aligned = pd.DataFrame(0, index=np.arange(X_qi.shape[0]), columns=training_features, dtype='float64')
+                    for col in X_qi.columns:
+                        if col in X_qi_aligned.columns:
+                            X_qi_aligned[col] = X_qi[col].values
+
+                    qi_pred = int(best_model.predict(X_qi_aligned)[0])
+                    performance_map = {0: 'Low', 1: 'Medium', 2: 'High'}
+                    qi_label = performance_map.get(qi_pred, 'Unknown')
+
+                    qi_conf = None
+                    qi_score = 0.0
+                    if hasattr(best_model, 'predict_proba'):
+                        qi_conf = best_model.predict_proba(X_qi_aligned)[0]
+                        qi_score = qi_conf[qi_pred]
+
+                    # Show predicted category and a clear confidence percentage
+                    c1, c2 = st.columns([2,1])
+                    with c1:
+                        st.metric("🎯 Predicted Category", qi_label)
+                    with c2:
+                        st.metric("Confidence", f"{(qi_score*100):.1f}%")
+
+                    # Small probability bar chart for Low/Medium/High
+                    if qi_conf is not None:
+                        probs = qi_conf
+                        fig_qi = go.Figure(data=[
+                            go.Bar(x=['Low','Medium','High'], y=probs, marker_color=['#ff6b6b','#ffd93d','#6bcf7f'], text=[f"{p*100:.1f}%" for p in probs], textposition='auto')
+                        ])
+                        fig_qi.update_layout(title="Prediction Probabilities", height=260, yaxis=dict(range=[0,1]))
+                        st.plotly_chart(fig_qi, use_container_width=True)
+
+                    # Debug info: show cleaned input, aligned features, and raw probabilities
+                    with st.expander("🛠️ Debug: Input & Feature Vector", expanded=False):
+                        try:
+                            st.write("**Cleaned input sent to preprocessor:**")
+                            st.dataframe(qi_input.T, use_container_width=True)
+                        except Exception:
+                            st.write("Could not display cleaned input")
+
+                        try:
+                            # X_qi_aligned may be numpy or DataFrame
+                            if isinstance(X_qi_aligned, pd.DataFrame):
+                                df_feats = X_qi_aligned
+                            else:
+                                df_feats = pd.DataFrame(X_qi_aligned, columns=training_features)
+                            st.write("**Aligned feature vector (first 40 cols):**")
+                            st.dataframe(df_feats.iloc[:, :40], use_container_width=True)
+                        except Exception as e:
+                            st.write("Could not build aligned feature vector:", str(e))
+
+                        try:
+                            if qi_conf is not None:
+                                st.write("**Raw probabilities:**", [float(p) for p in qi_conf])
+                        except Exception:
+                            pass
+
+                except Exception as e:
+                    st.error(f"Quick prediction error: {e}")
         
         # Create tabs for better organization
         tab1, tab2, tab3 = st.tabs(["📋 Student Info", "🎯 Prediction Result", "📊 Detailed Analysis"])
@@ -212,40 +509,39 @@ else:
                     input_data = pd.DataFrame({
                         'Hours_Studied': [float(hours_studied)],
                         'Attendance': [float(attendance)],
-                        'Parental_Involvement': [float(parental_involvement)],
-                        'Access_to_Resources': [float(access_to_resources)],
-                        'Extracurricular_Activities': [float(extracurricular)],
+                        'Parental_Involvement': [map_numeric_to_category(parental_involvement, '3level')],
+                        'Access_to_Resources': [map_numeric_to_category(access_to_resources, '3level')],
+                        'Extracurricular_Activities': [map_numeric_to_category(extracurricular, 'yesno')],
                         'Sleep_Hours': [float(sleep_hours)],
                         'Previous_Scores': [float(previous_scores)],
-                        'Motivation_Level': [float(motivation)],
-                        'Internet_Access': [float(1 if internet_access == "Yes" else 0)],
+                        'Motivation_Level': [map_numeric_to_category(motivation, '3level')],
+                        'Internet_Access': [str('Yes' if internet_access == 'Yes' else 'No')],
                         'Tutoring_Sessions': [float(tutoring)],
                         'Family_Income': [str(family_income)],
-                        'Teacher_Quality': [float(teacher_quality)],
+                        'Teacher_Quality': [map_numeric_to_category(teacher_quality, '3level')],
                         'School_Type': [str(school_type)],
-                        'Peer_Influence': [float(peer_influence)],
+                        'Peer_Influence': [map_numeric_to_category(peer_influence, 'peer')],
                         'Physical_Activity': [float(physical_activity)],
-                        'Learning_Disabilities': [float(1 if learning_disability == "Yes" else 0)],
+                        'Learning_Disabilities': [str('Yes' if learning_disability == 'Yes' else 'No')],
                         'Parental_Education_Level': [str(parent_education)],
-                        'Distance_from_Home': [float(distance_from_home)],
+                        'Distance_from_Home': [map_numeric_to_category(distance_from_home, 'distance')],
                         'Gender': [str(gender)]
                     })
                     
-                    # Ensure proper dtypes
-                    numeric_cols = ['Hours_Studied', 'Attendance', 'Parental_Involvement', 'Access_to_Resources',
-                                   'Extracurricular_Activities', 'Sleep_Hours', 'Previous_Scores', 'Motivation_Level',
-                                   'Internet_Access', 'Tutoring_Sessions', 'Teacher_Quality', 'Peer_Influence',
-                                   'Physical_Activity', 'Learning_Disabilities', 'Distance_from_Home']
-                    
+                    # Ensure proper dtypes: keep categorical fields as strings and only cast true numerics
+                    numeric_cols = ['Hours_Studied', 'Attendance', 'Sleep_Hours', 'Previous_Scores', 'Tutoring_Sessions', 'Physical_Activity']
                     for col in numeric_cols:
-                        input_data[col] = input_data[col].astype('float64')
-                    
-                    categorical_cols = ['Family_Income', 'School_Type', 'Parental_Education_Level', 'Gender']
+                        input_data[col] = pd.to_numeric(input_data[col], errors='coerce').fillna(0).astype('float64')
+
+                    categorical_cols = ['Family_Income', 'School_Type', 'Parental_Education_Level', 'Gender',
+                                        'Parental_Involvement', 'Access_to_Resources', 'Extracurricular_Activities',
+                                        'Motivation_Level', 'Internet_Access', 'Teacher_Quality', 'Peer_Influence',
+                                        'Learning_Disabilities', 'Distance_from_Home']
                     for col in categorical_cols:
                         input_data[col] = input_data[col].astype('str')
                     
                     # Transform features
-                    X_transformed = preprocessor.transform(input_data)
+                    X_transformed = safe_transform(input_data)
                     X_transformed = pd.DataFrame(X_transformed).astype('float64')
                     
                     # Align with training features
@@ -321,39 +617,38 @@ else:
                     input_data = pd.DataFrame({
                         'Hours_Studied': [float(hours_studied)],
                         'Attendance': [float(attendance)],
-                        'Parental_Involvement': [float(parental_involvement)],
-                        'Access_to_Resources': [float(access_to_resources)],
-                        'Extracurricular_Activities': [float(extracurricular)],
+                        'Parental_Involvement': [map_numeric_to_category(parental_involvement, '3level')],
+                        'Access_to_Resources': [map_numeric_to_category(access_to_resources, '3level')],
+                        'Extracurricular_Activities': [map_numeric_to_category(extracurricular, 'yesno')],
                         'Sleep_Hours': [float(sleep_hours)],
                         'Previous_Scores': [float(previous_scores)],
-                        'Motivation_Level': [float(motivation)],
-                        'Internet_Access': [float(1 if internet_access == "Yes" else 0)],
+                        'Motivation_Level': [map_numeric_to_category(motivation, '3level')],
+                        'Internet_Access': [str('Yes' if internet_access == 'Yes' else 'No')],
                         'Tutoring_Sessions': [float(tutoring)],
                         'Family_Income': [str(family_income)],
-                        'Teacher_Quality': [float(teacher_quality)],
+                        'Teacher_Quality': [map_numeric_to_category(teacher_quality, '3level')],
                         'School_Type': [str(school_type)],
-                        'Peer_Influence': [float(peer_influence)],
+                        'Peer_Influence': [map_numeric_to_category(peer_influence, 'peer')],
                         'Physical_Activity': [float(physical_activity)],
-                        'Learning_Disabilities': [float(1 if learning_disability == "Yes" else 0)],
+                        'Learning_Disabilities': [str('Yes' if learning_disability == 'Yes' else 'No')],
                         'Parental_Education_Level': [str(parent_education)],
-                        'Distance_from_Home': [float(distance_from_home)],
+                        'Distance_from_Home': [map_numeric_to_category(distance_from_home, 'distance')],
                         'Gender': [str(gender)]
                     })
                     
-                    # Ensure proper dtypes
-                    numeric_cols = ['Hours_Studied', 'Attendance', 'Parental_Involvement', 'Access_to_Resources',
-                                   'Extracurricular_Activities', 'Sleep_Hours', 'Previous_Scores', 'Motivation_Level',
-                                   'Internet_Access', 'Tutoring_Sessions', 'Teacher_Quality', 'Peer_Influence',
-                                   'Physical_Activity', 'Learning_Disabilities', 'Distance_from_Home']
-                    
+                    # Ensure proper dtypes: only cast true numeric fields
+                    numeric_cols = ['Hours_Studied', 'Attendance', 'Sleep_Hours', 'Previous_Scores', 'Tutoring_Sessions', 'Physical_Activity']
                     for col in numeric_cols:
-                        input_data[col] = input_data[col].astype('float64')
-                    
-                    categorical_cols = ['Family_Income', 'School_Type', 'Parental_Education_Level', 'Gender']
+                        input_data[col] = pd.to_numeric(input_data[col], errors='coerce').fillna(0).astype('float64')
+
+                    categorical_cols = ['Family_Income', 'School_Type', 'Parental_Education_Level', 'Gender',
+                                        'Parental_Involvement', 'Access_to_Resources', 'Extracurricular_Activities',
+                                        'Motivation_Level', 'Internet_Access', 'Teacher_Quality', 'Peer_Influence',
+                                        'Learning_Disabilities', 'Distance_from_Home']
                     for col in categorical_cols:
                         input_data[col] = input_data[col].astype('str')
                     
-                    X_transformed = preprocessor.transform(input_data)
+                    X_transformed = safe_transform(input_data)
                     X_transformed = pd.DataFrame(X_transformed).astype('float64')
                     
                     X_aligned = pd.DataFrame(0, index=np.arange(X_transformed.shape[0]), columns=training_features, dtype='float64')
@@ -587,16 +882,15 @@ else:
                 except Exception as prep_error:
                     st.warning(f"Using basic data cleaning: {str(prep_error)}")
                     # Fallback: manually clean data
-                    numeric_cols = ['Hours_Studied', 'Attendance', 'Parental_Involvement', 'Access_to_Resources',
-                                   'Extracurricular_Activities', 'Sleep_Hours', 'Previous_Scores', 'Motivation_Level',
-                                   'Internet_Access', 'Tutoring_Sessions', 'Teacher_Quality', 'Peer_Influence',
-                                   'Physical_Activity', 'Learning_Disabilities', 'Distance_from_Home']
-                    
+                    numeric_cols = ['Hours_Studied', 'Attendance', 'Sleep_Hours', 'Previous_Scores', 'Tutoring_Sessions', 'Physical_Activity']
                     for col in numeric_cols:
                         if col in data.columns:
                             data[col] = pd.to_numeric(data[col], errors='coerce').fillna(0).astype('float64')
-                    
-                    categorical_cols = ['Family_Income', 'School_Type', 'Parental_Education_Level', 'Gender']
+
+                    categorical_cols = ['Family_Income', 'School_Type', 'Parental_Education_Level', 'Gender',
+                                        'Parental_Involvement', 'Access_to_Resources', 'Extracurricular_Activities',
+                                        'Motivation_Level', 'Internet_Access', 'Teacher_Quality', 'Peer_Influence',
+                                        'Learning_Disabilities', 'Distance_from_Home']
                     for col in categorical_cols:
                         if col in data.columns:
                             data[col] = data[col].fillna('Unknown').astype('str')
